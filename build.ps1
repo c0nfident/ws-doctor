@@ -44,7 +44,14 @@ if ($SkipTests) {
     Write-Host '[3/4] 测试跳过'
 } else {
     try {
-        Import-Module Pester -MinimumVersion 3.0 -ErrorAction Stop
+        # 固定加载 Pester 3.x：测试使用 Pester 3 语法（Should Be），
+        # CI runner 自带 Pester 5 时 -MinimumVersion 会加载 5 导致全部失败。
+        $pester3 = Get-Module -ListAvailable Pester |
+            Where-Object { $_.Version -ge [version]'3.0' -and $_.Version -lt [version]'4.0' } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+        if ($null -eq $pester3) { throw '未安装 Pester 3.x（请安装 Pester 3.4.0）' }
+        Import-Module $pester3.Path -Force -ErrorAction Stop
         $testArgs = @{ Path = (Join-Path $root 'tests'); PassThru = $true }
         if ($Coverage) { $testArgs.CodeCoverage = (Join-Path $root 'WsDoctor.psm1') }
         $testResult = Invoke-Pester @testArgs
