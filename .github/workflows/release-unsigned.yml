@@ -1,0 +1,87 @@
+name: Release (unsigned)
+
+# 首次发布使用：SignPath Foundation 要求项目"已经发布"后才能申请免费签名。
+# 审核通过后请改用 release-signed.yml 发布正式签名版。
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不含 v，例如 1.4.0）'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布 unsigned 版本
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 解析版本
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          $version = $tag.TrimStart('v')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "version=$version"
+
+      - name: 构建 self-contained 单文件 exe
+        run: >
+          dotnet publish gui/WsDoctorGui.csproj -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
+          -o dist-unsigned --nologo
+
+      - name: 自检验证
+        shell: pwsh
+        env:
+          WSDOC_GUI_ROOT: ${{ github.workspace }}
+        run: |
+          $exe = 'dist-unsigned/WsDoctorGui.exe'
+          $process = Start-Process -FilePath $exe -ArgumentList '--selftest' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "self-test 失败（exit=$($process.ExitCode)）" }
+          $process = Start-Process -FilePath $exe -ArgumentList '--uitest' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "ui-test 失败（exit=$($process.ExitCode)）" }
+
+      - name: 打包 + 生成校验和
+        shell: pwsh
+        run: |
+          $version = '${{ steps.meta.outputs.version }}'
+          $packageDir = Join-Path $env:RUNNER_TEMP "wsdoctor-gui-$version"
+          New-Item -ItemType Directory -Path $packageDir | Out-Null
+          Copy-Item dist-unsigned/WsDoctorGui.exe $packageDir
+          Copy-Item LICENSE $packageDir
+          $hash = (Get-FileHash (Join-Path $packageDir 'WsDoctorGui.exe') -Algorithm SHA256).Hash
+          "$hash  WsDoctorGui.exe" | Set-Content -LiteralPath (Join-Path $packageDir 'SHA256SUMS.txt') -Encoding ascii
+          $zip = "wsdoctor-gui-$version-unsigned.zip"
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zip
+          "zip=$zip" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: 创建 GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = '${{ steps.meta.outputs.tag }}'
+          $zip = Get-ChildItem "wsdoctor-gui-*-unsigned.zip" | Select-Object -First 1 -ExpandProperty FullName
+          $notes = @"
+          WsDoctor $tag 首次发布（未签名）。
+
+          本版本用于满足 SignPath Foundation "项目必须已发布" 的申请条件；
+          SignPath 审核通过后，后续 release 会由 SignPath Foundation 免费签名。
+          下载后请核对 SHA256SUMS.txt。
+          "@
+          gh release create $tag $zip --title "WsDoctor $tag" --notes $notes

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>WsDoctorGui</AssemblyName>
+    <RootNamespace>WsDoctorGui</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- 自定义控件属性不参与 WinForms 设计器序列化 -->
+    <NoWarn>$(NoWarn);WFO1000</NoWarn>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <DebugType>embedded</DebugType>
+    <Version>1.4.0</Version>
+    <Company>confident</Company>
+    <Copyright>Copyright (c) 2026 c0nfident</Copyright>
+    <AssemblyTitle>WsDoctor GUI</AssemblyTitle>
+    <RepositoryUrl>https://github.com/c0nfident/ws-doctor</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Product>WsDoctor GUI</Product>
+    <Description>WsDoctor 工作区体检工具的 C# WinForms 前端（PowerShell 桥接）</Description>
+  </PropertyGroup>
+
+</Project>

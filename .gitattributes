@@ -1,0 +1,24 @@
+# 统一换行：仓库内文本用 LF，Windows 脚本在检出时保持原样
+* text=auto
+
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.psd1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.xml text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.pfx binary
+*.cer binary

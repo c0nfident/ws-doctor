@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  module-tests:
+    name: 模块 lint + Pester
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Pester 3.4（模块测试使用 Pester 3 语法）
+        shell: pwsh
+        run: |
+          try { Set-PSRepository -Name PSGallery -InstallationPolicy Trusted -ErrorAction Stop } catch { }
+          Install-Module Pester -RequiredVersion 3.4.0 -Force -SkipPublisherCheck -AllowClobber -Scope CurrentUser
+
+      - name: 质量门禁（lint + 50 项测试）
+        shell: pwsh
+        run: |
+          Import-Module Pester -RequiredVersion 3.4.0 -Force
+          ./build.ps1
+
+  gui-build:
+    name: GUI 构建 + 自检 + 集成
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 构建 GUI（标准 .NET SDK）
+        run: dotnet build gui/WsDoctorGui.csproj -c Release --nologo
+
+      - name: C# 自检 + UI 回归
+        shell: pwsh
+        env:
+          WSDOC_GUI_ROOT: ${{ github.workspace }}
+        run: |
+          $exe = 'gui/bin/Release/net10.0-windows/WsDoctorGui.exe'
+          foreach ($mode in @('--selftest', '--uitest')) {
+            $process = Start-Process -FilePath $exe -ArgumentList $mode -Wait -PassThru -WindowStyle Hidden
+            if ($process.ExitCode -ne 0) { throw "$mode 失败（exit=$($process.ExitCode)）" }
+            Write-Host "$mode 通过"
+          }
+
+      - name: 集成测试（PowerShell 7 + 模块桥接）
+        shell: pwsh
+        env:
+          WSDOC_GUI_ROOT: ${{ github.workspace }}
+        run: |
+          $process = Start-Process -FilePath 'gui/bin/Release/net10.0-windows/WsDoctorGui.exe' `
+            -ArgumentList '--integration' -Wait -PassThru -WindowStyle Hidden
+          if ($process.ExitCode -ne 0) { throw "integration 失败（exit=$($process.ExitCode)）" }
+          Write-Host 'integration 通过'

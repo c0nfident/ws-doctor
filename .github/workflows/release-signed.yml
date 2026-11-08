@@ -1,0 +1,137 @@
+name: Release (signed by SignPath Foundation)
+
+# 前提：SignPath Foundation 申请通过 + 仓库配置好以下 secrets / variables（见 docs/SIGNPATH-APPLICATION.md）：
+#   secrets.SIGNPATH_API_TOKEN
+#   vars.SIGNPATH_ORGANIZATION_ID
+#   vars.SIGNPATH_PROJECT_SLUG
+#   vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG   (默认 artifact-configuration)
+#   vars.SIGNPATH_SIGNING_POLICY_SLUG
+# 每次签名请求需要在 SignPath 界面由 Approver 手动批准（Approvals）。
+
+# 注意：SignPath 审核通过、配好 secrets/vars 之前，本工作流只手动触发（避免与 unsigned release 冲突）。
+# 审核通过后可取消下面 push.tags 的注释，实现打 tag 自动签名发布。
+on:
+  # push:
+  #   tags:
+  #     - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（不含 v，例如 1.4.0）'
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: 构建 → SignPath 签名 → 发布
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: 解析版本
+        id: meta
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = "${{ github.ref_name }}" }
+          $version = $tag.TrimStart('v')
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=v$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "version=$version"
+
+      - name: 构建 self-contained 单文件 exe（GitHub 托管 runner）
+        run: >
+          dotnet publish gui/WsDoctorGui.csproj -c Release -r win-x64
+          --self-contained true -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none
+          -o dist-unsigned --nologo
+
+      - name: 自检验证
+        shell: pwsh
+        env:
+          WSDOC_GUI_ROOT: ${{ github.workspace }}
+        run: |
+          $exe = 'dist-unsigned/WsDoctorGui.exe'
+          foreach ($mode in @('--selftest', '--uitest')) {
+            $process = Start-Process -FilePath $exe -ArgumentList $mode -Wait -PassThru -WindowStyle Hidden
+            if ($process.ExitCode -ne 0) { throw "$mode 失败（exit=$($process.ExitCode)）" }
+          }
+
+      - name: 上传待签名 artifact（SignPath 要求先存为 GitHub workflow artifact）
+        id: upload-unsigned-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wsdoctor-unsigned-${{ steps.meta.outputs.version }}
+          path: dist-unsigned/WsDoctorGui.exe
+          if-no-files-found: error
+
+      - name: 提交 SignPath 签名请求（等待人工批准）
+        id: sign
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-unsigned-artifact.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist-signed
+          parameters: |
+            version: "${{ steps.meta.outputs.version }}"
+
+      - name: 校验签名
+        shell: pwsh
+        run: |
+          $signed = 'dist-signed/WsDoctorGui.exe'
+          if (-not (Test-Path $signed)) { throw '签名产物不存在' }
+          $signature = Get-AuthenticodeSignature -FilePath $signed
+          if ($signature.Status -ne 'Valid') {
+            throw "签名无效：Status=$($signature.Status) $($signature.StatusMessage)"
+          }
+          Write-Host ('签名有效：' + $signature.SignerCertificate.Subject)
+
+      - name: 打包 + 生成校验和
+        shell: pwsh
+        run: |
+          $version = '${{ steps.meta.outputs.version }}'
+          $packageDir = Join-Path $env:RUNNER_TEMP "wsdoctor-gui-$version-signed"
+          New-Item -ItemType Directory -Path $packageDir | Out-Null
+          Copy-Item dist-signed/WsDoctorGui.exe $packageDir
+          Copy-Item LICENSE $packageDir
+          $hash = (Get-FileHash (Join-Path $packageDir 'WsDoctorGui.exe') -Algorithm SHA256).Hash
+          "$hash  WsDoctorGui.exe" | Set-Content -LiteralPath (Join-Path $packageDir 'SHA256SUMS.txt') -Encoding ascii
+          $zip = "wsdoctor-gui-$version-signed.zip"
+          Compress-Archive -Path (Join-Path $packageDir '*') -DestinationPath $zip
+          Write-Host "打包完成：$zip"
+
+      - name: 创建/更新 GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = '${{ steps.meta.outputs.tag }}'
+          $zip = Get-ChildItem "wsdoctor-gui-*-signed.zip" | Select-Object -First 1 -ExpandProperty FullName
+          $notes = @"
+          WsDoctor $tag
+
+          **Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).**
+
+          下载后可用 `Get-AuthenticodeSignature .\WsDoctorGui.exe` 校验（Status=Valid）；
+          并核对 SHA256SUMS.txt。self-contained 版无需安装 .NET，但需要 PowerShell 7。
+          "@
+          $previous = gh release view $tag --json url -q .url 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag $zip --title "WsDoctor $tag" --notes $notes
+          } else {
+            gh release upload $tag $zip --clobber
+            gh release edit $tag --notes $notes
+          }

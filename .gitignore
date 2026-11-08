@@ -1,0 +1,14 @@
+.modules/
+.demo/
+*.tmp
+reports/
+coverage-missed.txt
+dist/
+gui/bin/
+gui/obj/
+gui/.dotnet-home/
+gui/dist-exe/
+gui/signing/*.pfx
+dist-selfcontained/
+wsdoctor-gui-*.zip
+gui/signing/

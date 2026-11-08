@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WsDoctor 自定义格式化视图：由 WsDoctor.psd1 的 FormatsToProcess 自动加载 -->
+<Configuration>
+  <ViewDefinitions>
+
+    <!-- WsScanResult：默认列表视图 -->
+    <View>
+      <Name>WsDoctor.ScanResult</Name>
+      <ViewSelectedBy>
+        <TypeName>WsScanResult</TypeName>
+      </ViewSelectedBy>
+      <ListControl>
+        <ListEntries>
+          <ListEntry>
+            <ListItems>
+              <ListItem>
+                <Label>根目录</Label>
+                <PropertyName>Root</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>文件数</Label>
+                <PropertyName>TotalFiles</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>总大小</Label>
+                <PropertyName>TotalSizeText</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>目录数</Label>
+                <PropertyName>DirectoryCount</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>耗时(ms)</Label>
+                <PropertyName>DurationMs</PropertyName>
+              </ListItem>
+              <ListItem>
+                <Label>访问错误</Label>
+                <PropertyName>ErrorCount</PropertyName>
+              </ListItem>
+            </ListItems>
+          </ListEntry>
+        </ListEntries>
+      </ListControl>
+    </View>
+
+    <!-- WsDuplicateGroup：重复文件组表格 -->
+    <View>
+      <Name>WsDoctor.DuplicateGroup</Name>
+      <ViewSelectedBy>
+        <TypeName>WsDuplicateGroup</TypeName>
+      </ViewSelectedBy>
+      <TableControl>
+        <TableHeaders>
+          <TableColumnHeader><Label>大小</Label><Width>10</Width></TableColumnHeader>
+          <TableColumnHeader><Label>份数</Label><Width>6</Width></TableColumnHeader>
+          <TableColumnHeader><Label>可回收</Label><Width>10</Width></TableColumnHeader>
+          <TableColumnHeader><Label>SHA256</Label><Width>14</Width></TableColumnHeader>
+          <TableColumnHeader><Label>样例文件</Label></TableColumnHeader>
+        </TableHeaders>
+        <TableRowEntries>
+          <TableRowEntry>
+            <TableColumnItems>
+              <TableColumnItem><PropertyName>SizeText</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>FileCount</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>WastedText</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>HashShort</PropertyName></TableColumnItem>
+              <TableColumnItem><PropertyName>SampleFile</PropertyName></TableColumnItem>
+            </TableColumnItems>
+          </TableRowEntry>
+        </TableRowEntries>
+      </TableControl>
+    </View>
+
+  </ViewDefinitions>
+</Configuration>

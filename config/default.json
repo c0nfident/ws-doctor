@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "scan": {
+    "top": 10,
+    "parallel": false,
+    "throttleLimit": 4,
+    "exclude": [
+      "[\\\\/]\\.git([\\\\/]|$)",
+      "[\\\\/]node_modules([\\\\/]|$)",
+      "[\\\\/]\\.dsh-snapshots([\\\\/]|$)",
+      "[\\\\/]\\.modules([\\\\/]|$)",
+      "[\\\\/]\\.venv([\\\\/]|$)",
+      "[\\\\/]\\$Recycle\\.Bin([\\\\/]|$)"
+    ]
+  },
+  "duplicates": {
+    "minSize": 1024
+  },
+  "report": {
+    "formats": [
+      "json",
+      "html"
+    ],
+    "outDir": "reports"
+  },
+  "workspace": {
+    "snapshotKeep": 4,
+    "residuePatterns": [
+      "^\\d{6,}$",
+      "^(nt_qq|All Users)$"
+    ]
+  }
+}

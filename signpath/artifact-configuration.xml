@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SignPath Artifact Configuration — WsDoctor GUI
+  在 SignPath 项目里新建 Artifact Configuration 时粘贴本文件（root element = <zip-file>，
+  因为 GitHub actions/upload-artifact 会把文件打成 ZIP）。
+
+  元数据约束（SignPath Foundation 要求）：
+    - product-name 必须与 exe 的 ProductName 一致：WsDoctor GUI
+    - product-version/file-version 必须与每次构建的版本一致（workflow 传入 version 参数）
+-->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <parameters>
+    <parameter name="version" required="true" />
+  </parameters>
+
+  <zip-file>
+    <pe-file-set
+        product-name="WsDoctor GUI"
+        product-version="${version}"
+        file-version="${version}"
+        original-filename="${file.name}">
+      <include path="WsDoctorGui.exe" />
+      <for-each>
+        <authenticode-sign hash-algorithm="sha256" />
+      </for-each>
+    </pe-file-set>
+  </zip-file>
+</artifact-configuration>

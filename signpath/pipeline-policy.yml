@@ -1,0 +1,18 @@
+# SignPath Pipeline Policy 草稿（SignPath 项目的 Signing Policy 里粘贴）
+#
+# 适用：SignPath Foundation - Open Source Code Signing
+# 作用：强制所有参与构建的 job 都跑在 GitHub 托管 runner 上（避免不可信的自托管环境）
+#       并可禁止 rerun 旧构建（避免"签名旧代码"）。
+
+github-build-policies:
+  version: '1.0'
+  disallow_reruns: false
+  runners:
+    require_github_hosted: true
+
+# 可选：约束代码签名审批流程（GitHub 分支规则），按需启用
+# github-scm-policies:
+#   version: '1.0'
+#   ruleset_constraints:
+#     - rules:
+#         - type: non_fast_forward
