@@ -452,7 +452,11 @@ Describe '补充覆盖（v0.7）' {
 
         $scan = Invoke-WsScan -Path $root -Top 3
 
-        ($scan.Directories | Where-Object { $_.Path -eq $root }).Severity | Should Be 'Info'
+        # CI runner 的 TEMP 可能是 8.3 短路径（RUNNER~1），扫描结果用长路径，需规范化后比较
+        $rootFull = [System.IO.Path]::GetFullPath($root)
+        $matched = @($scan.Directories | Where-Object { [System.IO.Path]::GetFullPath($_.Path) -eq $rootFull })
+        $matched.Count | Should Be 1
+        $matched[0].Severity | Should Be 'Info'
         $scan.TotalSize | Should BeGreaterThan (100MB)
     }
 
